@@ -3,48 +3,48 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <style>
-        body { margin: 0; background: #f0f0f0; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
-        #header { background: #333; color: white; width: 100%; padding: 15px 0; text-align: center; font-weight: bold; letter-spacing: 1px; }
+        body { margin: 0; background: #f0f0f0; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; touch-action: none; }
+        #header { background: #333; color: white; width: 100%; padding: 15px 0; text-align: center; font-weight: bold; letter-spacing: 1px; z-index: 30; }
         
         #court { 
-            position: relative; width: 350px; height: 600px; background: white; 
-            border: 4px solid #333; margin-top: 20px; border-radius: 5px; overflow: hidden;
+            position: relative; width: 350px; height: 500px; background: white; 
+            border: 4px solid #333; margin-top: 10px; border-radius: 5px; overflow: hidden;
         }
+
+        /* Drawing Canvas */
+        #drawLayer { position: absolute; top: 0; left: 0; z-index: 5; touch-action: none; }
 
         /* Court Markings */
         .line { position: absolute; border: 2px solid #777; pointer-events: none; }
         .half-court { width: 100%; top: 50%; height: 0; }
         .center-circle { width: 70px; height: 70px; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-        
-        /* The Key */
         .key { width: 80px; height: 120px; left: 50%; transform: translateX(-50%); }
         .top-key { top: 0; border-top: none; }
         .bot-key { bottom: 0; border-bottom: none; }
-        
-        /* 3-Point Arc */
-        .arc { 
-            width: 280px; height: 200px; border: 2px solid #777; border-radius: 140px; 
-            left: 50%; transform: translateX(-50%);
-        }
+        .arc { width: 280px; height: 200px; border: 2px solid #777; border-radius: 140px; left: 50%; transform: translateX(-50%); }
         .top-arc { top: -80px; }
         .bot-arc { bottom: -80px; }
 
         /* Players & Ball */
         .piece { 
-            position: absolute; width: 40px; height: 40px; border-radius: 50%; 
+            position: absolute; width: 38px; height: 38px; border-radius: 50%; 
             display: flex; align-items: center; justify-content: center; 
             font-weight: bold; color: white; z-index: 10;
-            touch-action: none; box-shadow: 0 4px 8px rgba(0,0,0,0.2); font-size: 20px;
+            touch-action: none; box-shadow: 0 4px 8px rgba(0,0,0,0.2); font-size: 18px;
         }
-        .red { background: rgba(192, 57, 43, 0.85); border: 2px solid #c0392b; }
-        .blue { background: rgba(41, 128, 185, 0.85); border: 2px solid #2980b9; }
-        
-        .ball { 
-            width: 30px; height: 30px; background: #e67e22; border: 2px solid #d35400; 
-            z-index: 11; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        }
-        .ball::after { content: '🏀'; font-size: 18px; }
+        .red { background: rgba(192, 57, 43, 0.9); border: 2px solid #c0392b; }
+        .blue { background: rgba(41, 128, 185, 0.9); border: 2px solid #2980b9; }
+        .ball { width: 28px; height: 28px; background: #e67e22; border: 2px solid #d35400; z-index: 11; border-radius: 50%; }
+        .ball::after { content: '🏀'; font-size: 16px; display: flex; justify-content: center; }
 
+        /* Bottom Control UI */
+        #controls { 
+            background: #fff; width: 100%; padding: 15px 0; display: flex; 
+            justify-content: center; gap: 8px; border-top: 2px solid #333; margin-top: auto;
+        }
+        .btn { padding: 10px 12px; border-radius: 5px; background: #444; color: white; border: none; font-size: 13px; font-weight: bold; cursor: pointer; }
+        .btn-active { outline: 2px solid #000; outline-offset: 2px; }
+        #redBtn.btn-active { color: #ff4d4d; outline-color: #ff4d4d; }
     </style>
 </head>
 <body>
@@ -52,29 +52,76 @@
 <div id="header">BASKETBALL COACHBOARD</div>
 
 <div id="court">
+    <canvas id="drawLayer"></canvas>
     <div class="line half-court"></div>
     <div class="line center-circle"></div>
     <div class="line key top-key"></div>
     <div class="line key bot-key"></div>
     <div class="line arc top-arc"></div>
     <div class="line arc bot-arc"></div>
-    
     <div id="pieces-layer"></div>
+</div>
+
+<div id="controls">
+    <button class="btn btn-active" id="blackBtn" onclick="setTool('draw', 'black')">Black Ink</button>
+    <button class="btn" id="redBtn" onclick="setTool('draw', '#c0392b')">Red Ink</button>
+    <button class="btn" id="eraseBtn" onclick="setTool('erase')">Eraser</button>
+    <button class="btn" onclick="clearCanvas()">Clear Lines</button>
+    <button class="btn" onclick="initGame()">Reset All</button>
 </div>
 
 <script>
     const layer = document.getElementById('pieces-layer');
     const court = document.getElementById('court');
+    const canvas = document.getElementById('drawLayer');
+    const ctx = canvas.getContext('2d');
+    
+    let isDrawing = false;
+    let currentTool = 'draw';
+    let currentColor = 'black';
+
+    function initCanvas() {
+        canvas.width = court.clientWidth;
+        canvas.height = court.clientHeight;
+        ctx.lineCap = 'round';
+        ctx.lineWidth = 2; // Matches court line thickness
+    }
+
+    function setTool(tool, color) {
+        currentTool = tool;
+        if(color) currentColor = color;
+        document.getElementById('blackBtn').classList.toggle('btn-active', tool === 'draw' && currentColor === 'black');
+        document.getElementById('redBtn').classList.toggle('btn-active', tool === 'draw' && currentColor !== 'black');
+        document.getElementById('eraseBtn').classList.toggle('btn-active', tool === 'erase');
+    }
+
+    function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+    canvas.onpointerdown = (e) => {
+        isDrawing = true;
+        ctx.beginPath();
+        ctx.moveTo(e.offsetX, e.offsetY);
+    };
+
+    canvas.onpointermove = (e) => {
+        if (!isDrawing) return;
+        ctx.globalCompositeOperation = currentTool === 'erase' ? 'destination-out' : 'source-over';
+        ctx.strokeStyle = currentColor;
+        ctx.lineTo(e.offsetX, e.offsetY);
+        ctx.stroke();
+    };
+
+    canvas.onpointerup = () => { isDrawing = false; };
 
     function createPiece(type, num, x, y) {
         const p = document.createElement('div');
         p.className = `piece ${type}`;
         if (type !== 'ball') p.innerText = num;
-        
         p.style.left = x + 'px';
         p.style.top = y + 'px';
         
         p.onpointerdown = (e) => {
+            e.stopPropagation(); // Prevents drawing a dot when clicking a player
             p.setPointerCapture(e.pointerId);
             p.onpointermove = (ev) => {
                 const rect = court.getBoundingClientRect();
@@ -88,23 +135,15 @@
 
     function initGame() {
         layer.innerHTML = '';
-        // Ball
-        createPiece('ball', '', 160, 285);
-        
-        // Red Team (labeled 1-5)
-        const redPos = [[155, 450], [60, 350], [250, 350], [90, 180], [220, 180]];
-        for(let i=0; i<5; i++) {
-            createPiece('red', i+1, redPos[i][0], redPos[i][1]);
-        }
-
-        // Blue Team (labeled 1-5)
-        const bluePos = [[155, 110], [60, 80], [250, 80], [40, 230], [270, 230]];
-        for(let i=0; i<5; i++) {
-            createPiece('blue', i+1, bluePos[i][0], bluePos[i][1]);
-        }
+        clearCanvas();
+        createPiece('ball', '', 160, 235);
+        const redPos = [[155, 380], [60, 310], [250, 310], [90, 160], [220, 160]];
+        for(let i=0; i<5; i++) createPiece('red', i+1, redPos[i][0], redPos[i][1]);
+        const bluePos = [[155, 90], [60, 40], [250, 40], [40, 180], [270, 180]];
+        for(let i=0; i<5; i++) createPiece('blue', i+1, bluePos[i][0], bluePos[i][1]);
     }
 
-    initGame();
+    window.onload = () => { initCanvas(); initGame(); };
 </script>
 </body>
 </html>
